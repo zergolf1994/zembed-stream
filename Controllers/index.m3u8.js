@@ -3,7 +3,7 @@ const fs = require("fs-extra");
 const request = require("request");
 const os = require("os");
 
-const { Files, Storage } = require(`../Models`);
+const { Files, Storage, GroupDomain } = require(`../Models`);
 
 module.exports = async (req, res) => {
   try {
@@ -61,7 +61,23 @@ module.exports = async (req, res) => {
 
     const url = `http://${sv_ip}:8889/hls/${slug}/file_${quality}.mp4/index.m3u8`;
     let data = await getRequest(url);
-    let m3u8 = await M3U8({ data, slug, quality });
+
+    let domain = await GroupDomain.findOne({
+      raw: true,
+      where: {
+        type: "cloudflare",
+        active: 1,
+      },
+      attributes: ["id", "domain_list"],
+      order: [["count_used", "ASC"]],
+    });
+    if (!domain) return res.status(404).end();
+    let m3u8 = await M3U8({
+      domain: domain?.domain_list.split(/\r?\n/),
+      data,
+      slug,
+      quality,
+    });
 
     return res.status(200).end(m3u8);
   } catch (error) {
@@ -69,17 +85,25 @@ module.exports = async (req, res) => {
     return res.status(403).end();
   }
 };
-function M3U8({ data, slug, quality }) {
+function M3U8({ domain, data, slug, quality }) {
   try {
     return new Promise(function (resolve, reject) {
       const array = [];
+      let start = 0,
+        end = domain?.length - 1;
+
       data.forEach((k, i) => {
         if (isNaN(k)) {
           if (!k.match(/EXT-X-MAP:URI=(.*?)-/gm)) {
             array.push(k);
           }
         } else {
-          array.push(`//localhost/${slug}/${quality}-${k}.png`);
+          array.push(`//${domain[start]}/${slug}/${quality}-${k}.png`);
+          if (start == end) {
+            start = 0;
+          } else {
+            start++;
+          }
         }
       });
       resolve(array.join(os.EOL));

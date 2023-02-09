@@ -79,7 +79,7 @@ module.exports = async (req, res) => {
           ext == "html" ? "text/html" : `image/${ext}`;
         res.headers["Cache-control"] = "public, max-age=31536000";
       })
-      .on("data", function (chunk) {
+      /*.on("data", function (chunk) {
         length += chunk.length;
         buffers.push(chunk);
       })
@@ -90,7 +90,7 @@ module.exports = async (req, res) => {
         if (!fs.existsSync(cacheFile)) {
           fs.writeFileSync(cacheFile, Buffer.concat(buffers), "utf8");
         }
-      })
+      })*/
       .pipe(res);
   } catch (error) {
     console.log(error);

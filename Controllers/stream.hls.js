@@ -2,7 +2,7 @@ const path = require("path");
 const fs = require("fs-extra");
 const request = require("request");
 
-const { Files, Storage } = require(`../Models`);
+const { Files, Storages } = require(`../Models`);
 
 module.exports = async (req, res) => {
   try {
@@ -14,11 +14,11 @@ module.exports = async (req, res) => {
       storageFile = path.join(storageDir, `${slug}-${quality}`),
       cacheDir = path.join(global.dir, ".cache", slug),
       cacheFile = path.join(cacheDir, `${quality}-${seg}`),
-      sv_ip;
+      data = {};
 
     if (!fs.existsSync(storageFile)) {
       if (!fs.existsSync(storageDir)) {
-        fs.mkdirSync(storageDir);
+        fs.mkdirSync(storageDir, { recursive: true });
       }
 
       let file = await Files.Lists.findOne({
@@ -28,12 +28,12 @@ module.exports = async (req, res) => {
         attributes: ["id"],
         include: [
           {
-            model: Files.Videos,
-            as: "videos",
-            attributes: ["storageId"],
+            model: Files.Datas,
+            as: "datas",
             where: {
-              quality,
               active: 1,
+              type: "video",
+              name: quality,
             },
             required: true,
           },
@@ -42,9 +42,11 @@ module.exports = async (req, res) => {
 
       if (!file) return res.status(404).end();
 
-      let storageId = file?.videos[0]?.storageId;
 
-      let storage = await Storage.Lists.findOne({
+      const video = file?.datas[0];
+      let storageId = video?.storageId;
+      
+      let storage = await Storages.Lists.findOne({
         where: {
           id: storageId,
         },
@@ -53,23 +55,26 @@ module.exports = async (req, res) => {
 
       if (!storage) return res.status(404).end();
 
-      sv_ip = storage?.sv_ip;
-      fs.writeFileSync(storageFile, JSON.stringify(storage), "utf8");
+      data.sv_ip = storage?.sv_ip
+      data.file_name = video?.value;
+      
+      fs.writeFileSync(storageFile, JSON.stringify(data), "utf8");
     } else {
       let file_read = fs.readFileSync(storageFile, "utf8");
       let storage = JSON.parse(file_read);
-      sv_ip = storage?.sv_ip;
+      data.sv_ip = storage?.sv_ip
+      data.file_name = storage?.file_name;
     }
 
-    if (fs.existsSync(cacheFile)) {
+    /*if (fs.existsSync(cacheFile)) {
       let cache = fs.readFileSync(cacheFile);
       res.set("Content-Type", ext == "html" ? "text/html" : `image/${ext}`);
       res.set("Cache-control", "public, max-age=31536000");
       res.set("CDN-Cache", "HIT");
       return res.status(200).end(cache);
-    }
+    }*/
 
-    const url = `http://${sv_ip}:8889/hls/${slug}/file_${quality}.mp4/seg-${seg}-v1-a1.ts`;
+    const url = `http://${data.sv_ip}:8889/hls/${slug}/${data.file_name}/seg-${seg}-v1-a1.ts`;
 
     let buffers = [];
     let length = 0;
@@ -93,7 +98,6 @@ module.exports = async (req, res) => {
       })*/
       .pipe(res);
   } catch (error) {
-    console.log(error);
     return res.status(403).end();
   }
 };

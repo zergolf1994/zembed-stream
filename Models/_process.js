@@ -23,8 +23,7 @@ const Process = sequelize.define(
       defaultValue: "",
     },
     action: {
-      type: DataTypes.STRING(255),
-      defaultValue: "",
+      type: DataTypes.TEXT("long"),
     },
     quality: {
       type: DataTypes.STRING(255),
@@ -54,10 +53,6 @@ const Process = sequelize.define(
       {
         unique: false,
         fields: ["type"],
-      },
-      {
-        unique: false,
-        fields: ["action"],
       },
       {
         unique: false,
